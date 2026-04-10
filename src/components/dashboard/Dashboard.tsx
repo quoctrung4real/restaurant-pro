@@ -31,10 +31,16 @@ export default function Dashboard({ data }: DashboardProps) {
     const todayRev = todayRevenues.reduce((s, r) => s + r.amount, 0);
     const yesterdayRev = yesterdayRevenues.reduce((s, r) => s + r.amount, 0);
 
-    // Last 30 days
-    const last30 = data.revenues
+    // Last 30 days — exclude today if revenue is incomplete (< 20% of recent avg)
+    const allLast30 = data.revenues
       .filter(r => r.date >= new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0])
       .sort((a, b) => a.date.localeCompare(b.date));
+    
+    const avgLast7 = allLast30.slice(-7).filter(r => r.date !== today).reduce((s, r, _, a) => s + r.amount / a.length, 0);
+    const todayPartial = allLast30.find(r => r.date === today);
+    const last30 = todayPartial && avgLast7 > 0 && todayPartial.amount < avgLast7 * 0.3
+      ? allLast30.filter(r => r.date !== today)  // exclude incomplete today
+      : allLast30;
 
     const prev30 = data.revenues
       .filter(r => {
@@ -58,10 +64,10 @@ export default function Dashboard({ data }: DashboardProps) {
     // COGS estimate (avg 32% of revenue)
     const monthCOGS = monthRev * 0.32;
 
-    // Staff cost this month
+    // Staff cost: hourlyWage * 8h/day * 22 working days/month
     const staffCost = data.employees
       .filter(e => e.status === 'active')
-      .reduce((s, e) => s + e.hourlyWage * 8 * 26, 0);
+      .reduce((s, e) => s + e.hourlyWage * 8 * 22, 0);
 
     const totalCost = monthCOGS + monthlyFixed + staffCost;
     const profit = monthRev - totalCost;

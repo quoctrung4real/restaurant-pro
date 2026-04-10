@@ -32,6 +32,8 @@ interface SidebarProps {
 export default function Sidebar({ currentView, onNavigate, data }: SidebarProps) {
   // Count alerts
   const lowStockCount = data.ingredients.filter(i => i.stock <= i.minStock).length;
+  const occupiedTables = data.tables.filter(t => t.status === 'occupied').length;
+  const openOrders = data.orders.filter(o => o.status === 'open').length;
 
   return (
     <aside className="sidebar">
@@ -57,6 +59,12 @@ export default function Sidebar({ currentView, onNavigate, data }: SidebarProps)
               <span className="nav-label">{item.label}</span>
               {item.id === 'inventory' && lowStockCount > 0 && (
                 <span className="nav-badge">{lowStockCount}</span>
+              )}
+              {item.id === 'pos' && occupiedTables > 0 && (
+                <span className="nav-badge" style={{ background: 'rgba(59,130,246,0.8)' }}>{occupiedTables}</span>
+              )}
+              {item.id === 'pos' && openOrders > 0 && (
+                <span className="nav-badge" style={{ background: 'rgba(245,158,11,0.8)' }}>{openOrders}</span>
               )}
             </div>
           </div>

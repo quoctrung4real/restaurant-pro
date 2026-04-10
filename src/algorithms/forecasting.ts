@@ -448,8 +448,11 @@ export function generateForecastReport(
     };
   }
 
-  // Sort by date
-  const sorted = [...revenues].sort((a, b) => a.date.localeCompare(b.date));
+  // Sort by date, remove zero-revenue days and today's partial data
+  const today = new Date().toISOString().split('T')[0];
+  const sorted = [...revenues]
+    .filter(r => r.amount > 0 && r.date < today)  // exclude zero-days and today (partial)
+    .sort((a, b) => a.date.localeCompare(b.date));
   const values = sorted.map(r => r.amount);
   const dates = sorted.map(r => r.date);
 

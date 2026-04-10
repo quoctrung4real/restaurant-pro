@@ -13,6 +13,19 @@ export default function ReportsView({ data }: ReportsViewProps) {
   const [reportType, setReportType] = useState<'daily' | 'monthly' | 'yearly'>('monthly');
   const [exportStatus, setExportStatus] = useState<string | null>(null);
 
+  // Daily data: last 30 days
+  const dailyData = useMemo(() => {
+    const sorted = [...data.revenues].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 30);
+    return sorted.map(r => ({
+      period: r.date,
+      label: new Date(r.date).toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit' }),
+      revenue: r.amount,
+      orders: r.orderCount,
+      avgOrder: r.orderCount > 0 ? r.amount / r.orderCount : 0,
+    }));
+  }, [data]);
+
+  // Monthly data: last 12 months
   const monthlyData = useMemo(() => {
     const byMonth: Record<string, { revenue: number; orders: number }> = {};
     data.revenues.forEach(r => {
@@ -33,18 +46,39 @@ export default function ReportsView({ data }: ReportsViewProps) {
       }));
   }, [data]);
 
-  const totalRevenue = monthlyData.reduce((s, m) => s + m.revenue, 0);
-  const totalOrders = monthlyData.reduce((s, m) => s + m.orders, 0);
+  // Yearly data: by year
+  const yearlyData = useMemo(() => {
+    const byYear: Record<string, { revenue: number; orders: number }> = {};
+    data.revenues.forEach(r => {
+      const year = r.date.slice(0, 4);
+      if (!byYear[year]) byYear[year] = { revenue: 0, orders: 0 };
+      byYear[year].revenue += r.amount;
+      byYear[year].orders += r.orderCount;
+    });
+
+    return Object.entries(byYear)
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([year, stats]) => ({
+        period: year,
+        label: `Năm ${year}`,
+        ...stats,
+        avgOrder: stats.orders > 0 ? stats.revenue / stats.orders : 0,
+      }));
+  }, [data]);
+
+  const currentData = reportType === 'daily' ? dailyData : reportType === 'monthly' ? monthlyData : yearlyData;
+  const totalRevenue = currentData.reduce((s, m) => s + m.revenue, 0);
+  const totalOrders = currentData.reduce((s, m) => s + m.orders, 0);
 
   const exportCSV = () => {
-    const headers = ['Tháng', 'Doanh thu', 'Số đơn', 'TB/đơn'];
-    const rows = monthlyData.map(m => [m.label, m.revenue, m.orders, Math.round(m.avgOrder)].join(','));
+    const headers = ['Kỳ báo cáo', 'Doanh thu', 'Số đơn', 'TB/đơn'];
+    const rows = currentData.map(m => [m.label, m.revenue, m.orders, Math.round(m.avgOrder)].join(','));
     const csv = [headers.join(','), ...rows].join('\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `restaurant-report-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `restaurant-report-${reportType}-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     setExportStatus('✅ Đã xuất file CSV thành công!');
@@ -55,6 +89,7 @@ export default function ReportsView({ data }: ReportsViewProps) {
     const exportData = {
       exportDate: new Date().toISOString(),
       businessName: data.businessName,
+      reportType,
       summary: {
         totalRevenue,
         totalOrders,
@@ -62,7 +97,7 @@ export default function ReportsView({ data }: ReportsViewProps) {
         employeeCount: data.employees.length,
         customerCount: data.customers.length,
       },
-      monthlyRevenue: monthlyData,
+      data: currentData,
       menuItems: data.menuItems.map(i => ({ name: i.name, price: i.price, cost: i.cost })),
     };
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
@@ -79,6 +114,8 @@ export default function ReportsView({ data }: ReportsViewProps) {
   const printReport = () => {
     window.print();
   };
+
+  const periodLabel = reportType === 'daily' ? '30 ngày gần nhất' : reportType === 'monthly' ? '12 tháng gần nhất' : 'Theo năm';
 
   return (
     <div className="page-content">
@@ -112,7 +149,7 @@ export default function ReportsView({ data }: ReportsViewProps) {
         {[
           { icon: '📈', label: 'Tổng doanh thu', value: fmtCur(totalRevenue), color: 'green' },
           { icon: '🧾', label: 'Tổng số đơn', value: fmt(totalOrders), color: 'blue' },
-          { icon: '💰', label: 'TB doanh thu/tháng', value: fmtCur(totalRevenue / (monthlyData.length || 1)), color: 'orange' },
+          { icon: '💰', label: reportType === 'daily' ? 'TB doanh thu/ngày' : reportType === 'monthly' ? 'TB doanh thu/tháng' : 'TB doanh thu/năm', value: fmtCur(totalRevenue / (currentData.length || 1)), color: 'orange' },
           { icon: '📊', label: 'TB giá trị đơn', value: fmtCur(totalOrders > 0 ? totalRevenue / totalOrders : 0), color: 'violet' },
         ].map((k, i) => (
           <div className="kpi-card" key={i}>
@@ -125,15 +162,15 @@ export default function ReportsView({ data }: ReportsViewProps) {
 
       {/* Period tabs */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center', justifyContent: 'space-between' }}>
-        <h3 className="section-title">📋 Báo cáo theo thời gian</h3>
+        <h3 className="section-title">📋 Báo cáo {periodLabel}</h3>
         <div className="tabs">
-          {([['daily', 'Theo ngày'], ['monthly', 'Theo tháng'], ['yearly', 'Theo năm']] as const).map(([v, l]) => (
+          {([['daily', '30 ngày'], ['monthly', 'Theo tháng'], ['yearly', 'Theo năm']] as const).map(([v, l]) => (
             <button key={v} className={`tab-btn ${reportType === v ? 'active' : ''}`} onClick={() => setReportType(v)}>{l}</button>
           ))}
         </div>
       </div>
 
-      {/* Monthly Report Table */}
+      {/* Report Table */}
       <div className="table-container" style={{ marginBottom: 24 }}>
         <table>
           <thead>
@@ -142,13 +179,13 @@ export default function ReportsView({ data }: ReportsViewProps) {
               <th>Doanh thu</th>
               <th>Số đơn hàng</th>
               <th>TB/đơn</th>
-              <th>Chi phí ướctính (32%)</th>
+              <th>Chi phí ước tính (32%)</th>
               <th>Lợi nhuận gộp</th>
               <th>Biên GP</th>
             </tr>
           </thead>
           <tbody>
-            {monthlyData.map((m, i) => {
+            {currentData.map((m, i) => {
               const cogs = m.revenue * 0.32;
               const gross = m.revenue - cogs;
               const margin = m.revenue > 0 ? (gross / m.revenue * 100) : 0;

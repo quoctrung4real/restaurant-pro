@@ -24,8 +24,10 @@ export default function ForecastView({ data }: ForecastViewProps) {
     return generateForecastReport(data.revenues, horizon);
   }, [data.revenues, horizon]);
 
-  // Build chart: historical (last 60 days) + forecast
-  const sortedRevenues = [...data.revenues].sort((a, b) => a.date.localeCompare(b.date));
+  // Build chart: historical (last 60 days with data) + forecast
+  const sortedRevenues = [...data.revenues]
+    .filter(r => r.amount > 0)
+    .sort((a, b) => a.date.localeCompare(b.date));
   const historical = sortedRevenues.slice(-60);
 
   const historicalLabels = historical.map(r => {

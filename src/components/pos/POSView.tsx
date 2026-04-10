@@ -21,9 +21,12 @@ export default function POSView({ data, updateData }: POSViewProps) {
   const [showPayment, setShowPayment] = useState(false);
   const [lastReceipt, setLastReceipt] = useState<Order | null>(null);
   const [activeTab, setActiveTab] = useState<'order' | 'tables'>('order');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const filteredItems = data.menuItems.filter(item =>
-    item.available && (selectedCategory === 'all' || item.categoryId === selectedCategory)
+    item.available &&
+    (selectedCategory === 'all' || item.categoryId === selectedCategory) &&
+    (searchQuery === '' || item.name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const addToCart = (itemId: string) => {
@@ -213,6 +216,32 @@ export default function POSView({ data, updateData }: POSViewProps) {
 
           {activeTab === 'order' ? (
             <>
+              {/* Search */}
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ position: 'relative' }}>
+                  <span style={{
+                    position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)',
+                    color: 'var(--text-tertiary)', fontSize: '0.9rem', pointerEvents: 'none'
+                  }}>🔍</span>
+                  <input
+                    className="form-input"
+                    style={{ paddingLeft: 32, height: 36, fontSize: '0.85rem' }}
+                    placeholder="Tìm kiếm món ăn..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      style={{
+                        position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                        background: 'none', border: 'none', color: 'var(--text-tertiary)',
+                        cursor: 'pointer', fontSize: '0.9rem', padding: 2
+                      }}
+                    >✕</button>
+                  )}
+                </div>
+              </div>
               {/* Categories */}
               <div className="pos-menu-categories">
                 <button

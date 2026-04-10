@@ -39,8 +39,9 @@ export default function FinanceView({ data }: FinanceViewProps) {
     }, 0);
 
     const cogs = totalRevenue * 0.32;
+    // Staff cost: hourlyWage * 8h/day * 22 working days/month, prorated by period
     const staffCost = data.employees.filter(e => e.status === 'active')
-      .reduce((s, e) => s + e.hourlyWage * 8 * 26 * (days / 30), 0);
+      .reduce((s, e) => s + e.hourlyWage * 8 * 22 * (days / 30), 0);
 
     const totalCost = cogs + monthlyFixed + staffCost;
     const grossProfit = totalRevenue - cogs;
@@ -63,7 +64,7 @@ export default function FinanceView({ data }: FinanceViewProps) {
       return s;
     }, 0);
     const staffCost = data.employees.filter(e => e.status === 'active')
-      .reduce((s, e) => s + e.hourlyWage * 8 * 26, 0);
+      .reduce((s, e) => s + e.hourlyWage * 8 * 22, 0);
     const totalFixed = monthlyFixed + staffCost;
 
     const avgPrice = data.menuItems.reduce((s, i) => s + i.price, 0) / (data.menuItems.length || 1);
