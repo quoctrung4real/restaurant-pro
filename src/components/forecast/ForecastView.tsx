@@ -218,7 +218,7 @@ export default function ForecastView({ data }: ForecastViewProps) {
               Thực tế
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-tertiary)' }}>
-              <span style={{ width: 16, height: 2, background: '#10b981', display: 'inline-block', borderRadius: 1, borderTop: '2px dashed #10b981', background: 'none' } as any}></span>
+              <span style={{ width: 16, height: 2, display: 'inline-block', borderRadius: 1, borderTop: '2px dashed #10b981', background: 'none' }}></span>
               Dự báo
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-tertiary)' }}>
