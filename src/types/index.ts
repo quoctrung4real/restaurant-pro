@@ -81,7 +81,9 @@ export type Order = {
   createdAt: string;
   paidAt?: string;
   customerId?: string;
+  customerPhone?: string;
   note?: string;
+  transferCode?: string;
 };
 
 export type Employee = {
@@ -130,6 +132,8 @@ export type Customer = {
   segment: 'vip' | 'regular' | 'new' | 'inactive';
   favoriteItems?: string[];
   lastVisit?: string;
+  totalCost?: number;   // Automatically accumulated COGS of their past orders
+  totalMargin?: number; // Automatically accumulated profit margin
 };
 
 // =============================================
@@ -230,4 +234,44 @@ export type AppView =
   | 'engineering'
   | 'customers'
   | 'reports'
-  | 'settings';
+  | 'settings'
+  | 'admin';
+
+// =============================================
+// AUTHENTICATION & SECURITY TYPES
+// =============================================
+
+export type AdminRole = 'superadmin' | 'admin';
+export type AdminStatus = 'pending' | 'approved' | 'rejected';
+
+export type AdminUser = {
+  id: string;
+  username: string;
+  passwordHash: string; // Plaintext for demo purposes
+  fullName: string;
+  role: AdminRole;
+  status: AdminStatus;
+  createdAt: string;
+  lastLogin?: string;
+};
+
+export type LoginLog = {
+  id: string;
+  userId: string;
+  username: string;
+  timestamp: string;
+  ipAddress: string;
+  device: string;
+  status: 'success' | 'failed';
+};
+
+// =============================================
+// SETTINGS & BANKING TYPES
+// =============================================
+
+export type BankConfig = {
+  bankId: string;       // e.g., 'MB', 'VCB', 'TCB'
+  accountNumber: string;
+  accountName: string;
+  qrTemplate?: string;  // e.g., 'compact', 'qr_only', 'print'
+};

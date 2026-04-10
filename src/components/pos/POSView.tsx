@@ -18,7 +18,9 @@ export default function POSView({ data, updateData }: POSViewProps) {
   const [discount, setDiscount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer' | 'card'>('cash');
   const [customerNote, setCustomerNote] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
   const [showPayment, setShowPayment] = useState(false);
+  const [transferCode, setTransferCode] = useState('');
   const [lastReceipt, setLastReceipt] = useState<Order | null>(null);
   const [activeTab, setActiveTab] = useState<'order' | 'tables'>('order');
   const [searchQuery, setSearchQuery] = useState('');
@@ -64,26 +66,72 @@ export default function POSView({ data, updateData }: POSViewProps) {
   const taxAmount = Math.round((subtotal - discountAmount) * 0.08);
   const total = subtotal - discountAmount + taxAmount;
 
+  const openPaymentModal = () => {
+    if (cart.length === 0) return;
+    if (paymentMethod === 'transfer') {
+      const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const shortCode = Math.random().toString(36).substring(2, 6).toUpperCase();
+      setTransferCode(`ORD${dateStr}-${shortCode}`);
+    }
+    setShowPayment(true);
+  };
+
   const handlePay = () => {
     if (cart.length === 0) return;
 
-    const order: Order = {
-      id: uuidv4(),
-      tableId: selectedTable?.id,
-      tableNumber: selectedTable?.number,
-      items: cart,
-      subtotal,
-      discount: discountAmount,
-      tax: taxAmount,
-      total,
-      status: 'paid',
-      paymentMethod,
-      createdAt: new Date().toISOString(),
-      paidAt: new Date().toISOString(),
-      note: customerNote,
-    };
+    let customerId: string | undefined;
 
     updateData(prev => {
+      let newCustomers = [...prev.customers];
+      
+      // CRM Logic: Auto-link or Create Customer
+      if (customerPhone) {
+        let existing = newCustomers.find(c => c.phone === customerPhone);
+        if (existing) {
+          customerId = existing.id;
+          newCustomers = newCustomers.map(c => 
+            c.id === existing!.id ? { 
+              ...c, 
+              visitCount: c.visitCount + 1, 
+              totalSpent: c.totalSpent + total,
+              lastVisit: new Date().toISOString()
+            } : c
+          );
+        } else {
+          customerId = uuidv4();
+          newCustomers.push({
+            id: customerId,
+            name: 'Khách vãng lai',
+            phone: customerPhone,
+            points: Math.floor(total / 10000), // Mock points
+            totalSpent: total,
+            visitCount: 1,
+            joinDate: new Date().toISOString(),
+            segment: 'new',
+            lastVisit: new Date().toISOString()
+          });
+        }
+      }
+
+      const order: Order = {
+        id: uuidv4(),
+        tableId: selectedTable?.id,
+        tableNumber: selectedTable?.number,
+        items: cart,
+        subtotal,
+        discount: discountAmount,
+        tax: taxAmount,
+        total,
+        status: 'paid',
+        paymentMethod,
+        createdAt: new Date().toISOString(),
+        paidAt: new Date().toISOString(),
+        note: customerNote,
+        customerId,
+        customerPhone: customerPhone || undefined,
+        transferCode: paymentMethod === 'transfer' ? transferCode : undefined
+      };
+
       const newOrders = [...prev.orders, order];
 
       // Update table status
@@ -106,13 +154,14 @@ export default function POSView({ data, updateData }: POSViewProps) {
         newRevenues.push({ date: today, amount: total, orderCount: 1, avgOrderValue: total });
       }
 
-      return { ...prev, orders: newOrders, tables: newTables, revenues: newRevenues };
+      setLastReceipt(order);
+      return { ...prev, orders: newOrders, tables: newTables, revenues: newRevenues, customers: newCustomers };
     });
 
-    setLastReceipt(order);
     setCart([]);
     setDiscount(0);
     setCustomerNote('');
+    setCustomerPhone('');
     setSelectedTable(null);
     setShowPayment(false);
   };
@@ -184,6 +233,63 @@ export default function POSView({ data, updateData }: POSViewProps) {
                 🧾 Đơn mới
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showPayment && !lastReceipt && (
+        <div className="modal-overlay" onClick={() => setShowPayment(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Thanh toán Đơn hàng</h3>
+              <button className="modal-close" onClick={() => setShowPayment(false)}>✕</button>
+            </div>
+            
+            <div className="form-group" style={{ marginBottom: 16 }}>
+              <label className="form-label">Số điện thoại Khách hàng (Optional)</label>
+              <input
+                className="form-input"
+                placeholder="Nhập SĐT để tích điểm..."
+                value={customerPhone}
+                onChange={e => setCustomerPhone(e.target.value)}
+              />
+            </div>
+
+            {paymentMethod === 'transfer' ? (
+              <div style={{ textAlign: 'center', marginBottom: 24 }}>
+                <div style={{ background: '#fff', padding: 16, borderRadius: 12, display: 'inline-block', marginBottom: 16 }}>
+                  <img 
+                    src={`https://img.vietqr.io/image/${data.bankConfig.bankId}-${data.bankConfig.accountNumber}-${data.bankConfig.qrTemplate || 'compact'}.png?amount=${total}&addInfo=${transferCode}&accountName=${encodeURIComponent(data.bankConfig.accountName)}`} 
+                    alt="VietQR code" 
+                    style={{ width: 250, height: 250, objectFit: 'contain' }}
+                  />
+                </div>
+                <div style={{ fontSize: '1.2rem', fontWeight: 600, color: 'var(--primary-400)' }}>{fmtCur(total)}</div>
+                <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Mã ĐH: <strong>{transferCode}</strong></div>
+                
+                <button 
+                  className="btn btn-outline" 
+                  onClick={handlePay}
+                  style={{ marginTop: 24, width: '100%', borderColor: 'var(--success-text)', color: 'var(--success-text)' }}
+                >
+                  <span style={{ marginRight: 8, fontSize: '1.2rem' }}>🔔</span>
+                  Mô phỏng Webhook: Nhận Tiền Thành Công
+                </button>
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', marginBottom: 24 }}>
+                <div style={{ fontSize: '2.5rem', marginBottom: 16 }}>{paymentMethod === 'cash' ? '💵' : '💳'}</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 600, color: 'var(--primary-400)' }}>Cần thu: {fmtCur(total)}</div>
+              </div>
+            )}
+
+            {paymentMethod !== 'transfer' && (
+              <div className="modal-footer">
+                <button className="btn btn-primary" onClick={handlePay} style={{ width: '100%' }}>
+                  Xác nhận Khách đã thanh toán
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -434,10 +540,10 @@ export default function POSView({ data, updateData }: POSViewProps) {
             <button
               className="btn btn-primary"
               style={{ width: '100%', padding: '14px', fontSize: '1rem', justifyContent: 'center' }}
-              onClick={handlePay}
+              onClick={openPaymentModal}
               disabled={cart.length === 0}
             >
-              💳 Thanh toán {fmtCur(total)}
+              💳 Tới Thanh toán {fmtCur(total)}
             </button>
           </div>
         </div>

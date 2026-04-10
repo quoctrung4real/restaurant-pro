@@ -1,7 +1,8 @@
 import { v4 as uuidv4 } from 'uuid';
 import type {
   MenuItem, Category, Ingredient, Table, Order, Employee,
-  Customer, FixedCost, Revenue, Attendance, Supplier
+  Customer, FixedCost, Revenue, Attendance, Supplier,
+  AdminUser, LoginLog, BankConfig
 } from '../types';
 
 // =============================================
@@ -171,6 +172,9 @@ export type AppData = {
   revenues: Revenue[];
   attendances: Attendance[];
   suppliers: Supplier[];
+  users: AdminUser[];
+  loginLogs: LoginLog[];
+  bankConfig: BankConfig;
   businessName: string;
   businessType: string;
 };
@@ -198,6 +202,24 @@ export function loadData(): AppData {
     revenues: generateRevenueData(),
     attendances: [],
     suppliers: [],
+    users: [
+      {
+        id: 'admin-1',
+        username: 'admin',
+        passwordHash: 'admin123',
+        fullName: 'Super Admin',
+        role: 'superadmin',
+        status: 'approved',
+        createdAt: new Date().toISOString(),
+      }
+    ],
+    loginLogs: [],
+    bankConfig: {
+      bankId: 'MB',
+      accountNumber: '0999999999',
+      accountName: 'RESTAURANT PRO',
+      qrTemplate: 'compact'
+    },
     businessName: 'Quán Cà Phê Hương Việt',
     businessType: 'Quán Cà Phê & Ẩm Thực',
   };

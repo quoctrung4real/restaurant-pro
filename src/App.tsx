@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { AppView } from './types';
+import type { AppView, AdminUser } from './types';
 import type { AppData } from './data/store';
 import { loadData, saveData } from './data/store';
 import Sidebar from './components/layout/Sidebar';
@@ -15,10 +15,15 @@ import PricingView from './components/pricing/PricingView';
 import EngineeringView from './components/engineering/EngineeringView';
 import CustomersView from './components/customers/CustomersView';
 import ReportsView from './components/reports/ReportsView';
+import SettingsView from './components/settings/SettingsView';
+import AdminManagementView from './components/admin/AdminManagementView';
+import AuthView from './components/auth/AuthView';
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<AppView>('dashboard');
+  const [currentView, setCurrentView] = useState<AppView>('pos');
   const [data, setData] = useState<AppData>(() => loadData());
+  const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
+  const [showAuth, setShowAuth] = useState(false);
 
   const updateData = useCallback((updater: (prev: AppData) => AppData) => {
     setData(prev => {
@@ -47,11 +52,31 @@ export default function App() {
     customers: { title: '👤 Khách hàng (CRM)', desc: 'Quản lý khách hàng thân thiết' },
     reports: { title: '📄 Báo cáo & Xuất file', desc: 'Xuất báo cáo PDF và Excel' },
     settings: { title: '⚙️ Cài đặt', desc: 'Cấu hình hệ thống' },
+    admin: { title: '🛡️ Quản trị Tài khoản', desc: 'Quản lý tài khoản Admin và Nhật ký truy cập' },
   };
 
   const { title, desc } = viewTitles[currentView];
 
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setCurrentView('pos'); // Fallback to public permissible view
+  };
+
   const renderView = () => {
+    // Kiosk Mode Enforcer: Non-logged-in users can ONLY access POS
+    if (!currentUser && currentView !== 'pos') {
+      return (
+        <div className="page-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="card" style={{ textAlign: 'center', padding: 48 }}>
+            <h2 style={{ fontSize: 48, marginBottom: 16 }}>🔒</h2>
+            <h3 style={{ color: 'var(--text-primary)' }}>Vui lòng đăng nhập</h3>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: 24 }}>Bạn cần đăng nhập bằng tài khoản Quản lý để xem mục này.</p>
+            <button className="btn btn-primary" onClick={() => setShowAuth(true)}>🔐 Đăng nhập Quản lý</button>
+          </div>
+        </div>
+      );
+    }
+
     const props = { data, updateData };
     switch (currentView) {
       case 'dashboard': return <Dashboard {...props} />;
@@ -65,39 +90,34 @@ export default function App() {
       case 'engineering': return <EngineeringView {...props} />;
       case 'customers': return <CustomersView {...props} />;
       case 'reports': return <ReportsView {...props} />;
-      case 'settings': return (
-        <div className="page-content">
-          <div className="card" style={{ maxWidth: 500 }}>
-            <h2 style={{ marginBottom: 16, color: 'var(--text-primary)' }}>⚙️ Cài đặt hệ thống</h2>
-            <div className="form-group" style={{ marginBottom: 16 }}>
-              <label className="form-label">Tên cửa hàng</label>
-              <input
-                className="form-input"
-                value={data.businessName}
-                onChange={e => updateData(d => ({ ...d, businessName: e.target.value }))}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Loại hình kinh doanh</label>
-              <input
-                className="form-input"
-                value={data.businessType}
-                onChange={e => updateData(d => ({ ...d, businessType: e.target.value }))}
-              />
-            </div>
-          </div>
-        </div>
-      );
+      case 'settings': return <SettingsView {...props} />;
+      case 'admin': return <AdminManagementView {...props} currentUser={currentUser} />;
       default: return null;
     }
   };
 
   return (
     <div className="app">
+      {showAuth && (
+        <AuthView 
+          data={data} 
+          updateData={updateData} 
+          onClose={() => setShowAuth(false)} 
+          onLoginSuccess={(user) => {
+            setCurrentUser(user);
+            setShowAuth(false);
+            setCurrentView('dashboard');
+          }}
+        />
+      )}
+      
       <Sidebar
         currentView={currentView}
         onNavigate={setCurrentView}
         data={data}
+        currentUser={currentUser}
+        onOpenAuth={() => setShowAuth(true)}
+        onLogout={handleLogout}
       />
       <div className="main-content">
         <Header title={title} desc={desc} data={data} />

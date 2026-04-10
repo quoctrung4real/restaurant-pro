@@ -23,6 +23,7 @@ export default function CustomersView({ data, updateData }: CustomersViewProps) 
   const [editCust, setEditCust] = useState<Partial<Customer> | null>(null);
   const [filterSeg, setFilterSeg] = useState<string>('all');
   const [search, setSearch] = useState('');
+  const [viewingCust, setViewingCust] = useState<Customer | null>(null);
 
   const filtered = data.customers.filter(c =>
     (filterSeg === 'all' || c.segment === filterSeg) &&
@@ -103,6 +104,95 @@ export default function CustomersView({ data, updateData }: CustomersViewProps) 
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowModal(false)}>Hủy</button>
               <button className="btn btn-primary" onClick={saveCust}>💾 Lưu</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Customer Details Drawer */}
+      {viewingCust && (
+        <div className="modal-overlay" onClick={() => setViewingCust(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ width: 600, maxWidth: '90%', marginLeft: 'auto', marginRight: 0, height: '100%', borderRadius: '16px 0 0 16px', display: 'flex', flexDirection: 'column' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">👤 Chi tiết Khách hàng</h3>
+              <button className="modal-close" onClick={() => setViewingCust(null)}>✕</button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+               {(() => {
+                 const orders = data.orders.filter(o => o.customerId === viewingCust.id || o.customerPhone === viewingCust.phone);
+                 
+                 // Calculate true profitability
+                 let totalRevenue = 0;
+                 let totalCost = 0;
+
+                 orders.forEach(o => {
+                   totalRevenue += o.total; // Revenue from total bill
+                   o.items.forEach(it => {
+                     totalCost += it.cost * it.quantity;
+                   });
+                 });
+
+                 const grossProfit = totalRevenue - totalCost;
+                 const profitMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+
+                 return (
+                   <div>
+                     <div style={{ display: 'flex', gap: 16, marginBottom: 24, padding: 16, background: 'var(--bg-elevated)', borderRadius: 12 }}>
+                       <div style={{
+                          width: 56, height: 56, borderRadius: '50%',
+                          background: segmentConfig[viewingCust.segment].bg, border: `1px solid ${segmentConfig[viewingCust.segment].border}`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: '1.5rem', fontWeight: 700, color: segmentConfig[viewingCust.segment].color,
+                        }}>
+                          {viewingCust.name.charAt(0)}
+                       </div>
+                       <div>
+                         <h3 style={{ fontSize: '1.2rem', margin: 0, color: 'var(--text-primary)' }}>{viewingCust.name}</h3>
+                         <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: 4 }}>{viewingCust.phone || 'Chưa có SĐT'}</div>
+                         <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: 12, background: segmentConfig[viewingCust.segment].bg, color: segmentConfig[viewingCust.segment].color }}>{segmentConfig[viewingCust.segment].label}</span>
+                       </div>
+                     </div>
+
+                     <div className="kpi-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr', marginBottom: 24, gap: 12 }}>
+                        <div className="kpi-card" style={{ padding: 12 }}>
+                          <div className="kpi-label" style={{ fontSize: '0.75rem' }}>Doanh thu</div>
+                          <div className="kpi-value" style={{ fontSize: '1.1rem', color: '#10b981' }}>{fmtCur(totalRevenue || viewingCust.totalSpent)}</div>
+                        </div>
+                        <div className="kpi-card" style={{ padding: 12 }}>
+                          <div className="kpi-label" style={{ fontSize: '0.75rem' }}>Lợi nhuận gộp</div>
+                          <div className="kpi-value" style={{ fontSize: '1.1rem', color: '#3b82f6' }}>{fmtCur(grossProfit)}</div>
+                        </div>
+                        <div className="kpi-card" style={{ padding: 12 }}>
+                          <div className="kpi-label" style={{ fontSize: '0.75rem' }}>Biên lợi nhuận</div>
+                          <div className="kpi-value" style={{ fontSize: '1.1rem', color: '#8b5cf6' }}>{profitMargin.toFixed(1)}%</div>
+                        </div>
+                     </div>
+
+                     <h4 style={{ marginBottom: 16, color: 'var(--text-primary)' }}>Lịch sử giao dịch ({orders.length})</h4>
+                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        {orders.length === 0 ? (
+                          <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 24 }}>Chưa có giao dịch.</div>
+                        ) : (
+                          orders.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map(o => (
+                            <div key={o.id} style={{ padding: 12, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-subtle)' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{new Date(o.createdAt).toLocaleString()}</div>
+                                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--primary-400)' }}>{fmtCur(o.total)}</div>
+                              </div>
+                              <div style={{ fontSize: '0.85rem' }}>
+                                {o.items.map(it => `${it.quantity}x ${it.menuItemName}`).join(', ')}
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+                                <span>Thanh toán: {o.paymentMethod === 'transfer' ? 'CK' : o.paymentMethod === 'cash' ? 'Tiền mặt' : 'Thẻ'}</span>
+                                {o.transferCode && <span>Mã CK: {o.transferCode}</span>}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                     </div>
+                   </div>
+                 );
+               })()}
             </div>
           </div>
         </div>
@@ -210,7 +300,10 @@ export default function CustomersView({ data, updateData }: CustomersViewProps) 
                   <td style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{c.lastVisit || '—'}</td>
                   <td style={{ color: 'var(--text-tertiary)', fontSize: '0.78rem' }}>{c.joinDate}</td>
                   <td>
-                    <button className="btn btn-ghost btn-sm btn-icon" onClick={() => { setEditCust({ ...c }); setShowModal(true); }}>✏️</button>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setViewingCust(c)} title="Chi tiết">👀</button>
+                      <button className="btn btn-ghost btn-sm btn-icon" onClick={() => { setEditCust({ ...c }); setShowModal(true); }} title="Sửa">✏️</button>
+                    </div>
                   </td>
                 </tr>
               );
