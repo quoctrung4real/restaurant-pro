@@ -256,21 +256,35 @@ function generateSampleOrders(): Order[] {
     }
 
     const subtotal = orderItems.reduce((s, it) => s + it.price * it.quantity, 0);
-    const tax = Math.round(subtotal * 0.08);
-    const total = subtotal + tax;
+
+    // Xử lý các hóa đơn rủi ro (Fraud Detection demo)
+    let discount = 0;
+    let status: 'paid' | 'cancelled' = 'paid';
+
+    const randFraud = Math.random();
+    if (randFraud < 0.05) { // 5% chance of severe discount (fraud pattern)
+      discount = subtotal * 0.5; // 50% discount
+    } else if (randFraud > 0.92) { // 8% chance of void/cancelled order
+      status = 'cancelled';
+    } else if (randFraud > 0.8) {
+      discount = subtotal * 0.1; // 10% discount normal
+    }
+
+    const tax = Math.round((subtotal - discount) * 0.08);
+    const total = subtotal - discount + tax;
 
     orders.push({
       id: uuidv4(),
       tableNumber: Math.floor(Math.random() * 16) + 1,
       items: orderItems,
       subtotal,
-      discount: 0,
+      discount,
       tax,
       total,
-      status: 'paid',
+      status,
       paymentMethod: Math.random() > 0.5 ? 'cash' : 'transfer',
       createdAt: d.toISOString(),
-      paidAt: d.toISOString(),
+      paidAt: status === 'paid' ? d.toISOString() : undefined,
     });
   }
 
